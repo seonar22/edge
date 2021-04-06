@@ -11,7 +11,9 @@ import (
 	"github.com/packetframe/database"
 	"github.com/packetframe/servicerouter"
 	log "github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/packetframe/edge"
 )
@@ -84,6 +86,48 @@ func main() {
 		}
 
 		return ctx.Status(200).JSON(&fiber.Map{"message": "Container created"})
+	})
+
+	// Delete a container
+	app.Delete("/containers/:container", func(ctx *fiber.Ctx) error {
+		user, err := auth.GetUser(ctx, db)
+		if err != nil {
+			return resp(ctx, 403, "Unauthorized")
+		}
+
+		// Parse container ID
+		containerId, err := primitive.ObjectIDFromHex(ctx.Params("container"))
+		if err != nil {
+			return resp(ctx, 400, "Invalid container ID")
+		}
+
+		// Find container
+		var container edge.Container
+		if err := db.Db.Collection("containers").FindOne(context.Background(), &bson.M{
+			"_id": containerId,
+			"users": &bson.M{
+				"$in": [...]primitive.ObjectID{user.ID},
+			},
+		}).Decode(&container); err != nil {
+			if err == mongo.ErrNoDocuments {
+				return resp(ctx, 400, "Container doesn't exist")
+			} else {
+				log.Warn(err)
+				return resp(ctx, 500, "Unable to find container")
+			}
+		}
+
+		// Delete the container
+		res, err := db.Db.Collection("containers").DeleteOne(context.Background(), &bson.M{"_id": containerId})
+		if err != nil {
+			log.Warn(err)
+			return resp(ctx, 500, "Unable to delete container")
+		}
+		if res.DeletedCount != 1 {
+			return resp(ctx, 400, "Container doesn't exist")
+		}
+
+		return ctx.Status(200).JSON(&fiber.Map{"message": "Container deleted"})
 	})
 
 	log.Println("Starting API")
