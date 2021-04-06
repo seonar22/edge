@@ -31,6 +31,12 @@ func main() {
 	// Fiber API server
 	app := fiber.New(fiber.Config{DisableStartupMessage: true})
 	validate = validator.New()
+
+	// Register validators
+	if err := edge.RegisterValidators(validate); err != nil {
+		log.Fatal(err)
+	}
+
 	db, err := database.New("mongodb://localhost:27017", "packetframe")
 	if err != nil {
 		log.Fatal(err)
