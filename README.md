@@ -1,3 +1,3 @@
 # edge
 
-Packetframe anycast container orchestration
+Packetframe anycast container orchestration service
